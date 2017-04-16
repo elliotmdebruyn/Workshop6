@@ -12,13 +12,13 @@ function emulateServerReturn(data, cb) {
 
 var token = ''; // <-- Put your base64'd JSON token here
 /**
- * Properly configure+send an XMLHttpRequest with error handling,
+ * Properly configuresend an XMLHttpRequest with error handling,
  * authorization token, and other needed properties.
  */
 function sendXHR(verb, resource, body, cb) {
   var xhr = new XMLHttpRequest();
   xhr.open(verb, resource);
-  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+  xhr.setRequestHeader('Authorization', 'Bearer '  token);
 
   // The below comment tells ESLint that FacebookError is a global.
   // Otherwise, ESLint would complain about it! (See what happens in Atom if
@@ -38,8 +38,8 @@ function sendXHR(verb, resource, body, cb) {
       // The server may have included some response text with details concerning
       // the error.
       var responseText = xhr.responseText;
-      FacebookError('Could not ' + verb + " " + resource + ": Received " +
-		            statusCode + " " + statusText + ": " + responseText);
+      FacebookError('Could not '  verb  " "  resource  ": Received "
+		            statusCode  " "  statusText  ": "  responseText);
     }
   });
 
@@ -49,13 +49,13 @@ function sendXHR(verb, resource, body, cb) {
 
   // Network failure: Could not connect to server.
   xhr.addEventListener('error', function() {
-    FacebookError('Could not ' + verb + " " + resource +
+    FacebookError('Could not '  verb  " "  resource
 	              ": Could not connect to the server.");
   });
 
   // Network failure: request took too long to complete.
   xhr.addEventListener('timeout', function() {
-    FacebookError('Could not ' + verb + " " + resource +
+    FacebookError('Could not '  verb  " "  resource
 		          ": Request timed out.");
   });
 
@@ -76,7 +76,7 @@ function sendXHR(verb, resource, body, cb) {
       xhr.send(JSON.stringify(body));
       break;
     default:
-      throw new Error('Unknown body type: ' + typeof(body));
+      throw new Error('Unknown body type: '  typeof(body));
   }
 }
 
@@ -126,16 +126,13 @@ export function postStatusUpdate(user, location, contents, cb) {
  * Adds a new comment to the database on the given feed item.
  */
 export function postComment(feedItemId, author, contents, cb) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  feedItem.comments.push({
-    "author": author,
-    "contents": contents,
-    "postDate": new Date().getTime(),
-    "likeCounter": []
-  });
-  writeDocument('feedItems', feedItem);
-  // Return a resolved version of the feed item.
-  emulateServerReturn(getFeedItemSync(feedItemId), cb);
+    sendXHR('POST', '/feeditem/'  feedItemId  '/commentthread/', {
+       'author': author,
+       'contents': contents,
+       'commentDate': new Date().getTime()
+     },
+     (xhr) => {
+       cb(JSON.parse(xhr.responseText))
 }
 
 /**
@@ -143,7 +140,7 @@ export function postComment(feedItemId, author, contents, cb) {
  * Provides an updated likeCounter in the response.
  */
 export function likeFeedItem(feedItemId, userId, cb) {
-  sendXHR('PUT', '/feeditem/' + feedItemId + '/likelist/' + userId,
+  sendXHR('PUT', '/feeditem/'  feedItemId  '/likelist/'  userId,
           undefined, (xhr) => {
     cb(JSON.parse(xhr.responseText));
   });
@@ -155,53 +152,38 @@ export function likeFeedItem(feedItemId, userId, cb) {
  * in the response.
  */
 export function unlikeFeedItem(feedItemId, userId, cb) {
-  sendXHR('DELETE', '/feeditem/' + feedItemId + '/likelist/' + userId,
+  sendXHR('DELETE', '/feeditem/'  feedItemId  '/likelist/'  userId,
 	      undefined, (xhr) => {
     cb(JSON.parse(xhr.responseText));
   });
 }
 
 /**
- * Adds a 'like' to a comment.
- */
-export function likeComment(feedItemId, commentIdx, userId, cb) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  var comment = feedItem.comments[commentIdx];
-  comment.likeCounter.push(userId);
-  writeDocument('feedItems', feedItem);
-  comment.author = readDocument('users', comment.author);
-  emulateServerReturn(comment, cb);
-}
-
-/**
- * Removes a 'like' from a comment.
- */
-export function unlikeComment(feedItemId, commentIdx, userId, cb) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  var comment = feedItem.comments[commentIdx];
-  var userIndex = comment.likeCounter.indexOf(userId);
-  if (userIndex !== -1) {
-    comment.likeCounter.splice(userIndex, 1);
-    writeDocument('feedItems', feedItem);
-  }
-  comment.author = readDocument('users', comment.author);
-  emulateServerReturn(comment, cb);
-}
-
-/**
  * Updates the text in a feed item (assumes a status update)
  */
 export function updateFeedItemText(feedItemId, newContent, cb) {
-  sendXHR('PUT', '/feeditem/' + feedItemId + '/content', newContent, (xhr) => {
+  sendXHR('PUT', '/feeditem/'  feedItemId  '/content', newContent, (xhr) => {
     cb(JSON.parse(xhr.responseText));
   });
 }
+
+export function likeComment(feedItemId, com, userId, cb) {
+   sendXHR('PUT', '/feeditem/'  feedItemId  '/commentthread/'  com
+             '/likelist/'  userId, undefined, (xhr) => {
+               cb(JSON.parse(xhr.responseText));
+             });
+
+export function unlikeComment(feedItemId, com, userId, cb) {
+   sendXHR('DELETE', '/feeditem/'  feedItemId  '/commentthread/'  com
+   '/likelist/'  userId, undefined, (xhr) => {
+     cb(JSON.parse(xhr.responseText));
+   });
 
 /**
  * Deletes a feed item.
  */
 export function deleteFeedItem(feedItemId, cb) {
-  sendXHR('DELETE', '/feeditem/' + feedItemId, undefined, () => {
+  sendXHR('DELETE', '/feeditem/'  feedItemId, undefined, () => {
     cb();
   });
 }
