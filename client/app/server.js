@@ -1,24 +1,14 @@
 import {readDocument, writeDocument, addDocument, deleteDocument, getCollection} from './database.js';
 
+var token = 'eyJpZCI6NH0='; // <-- Put your base64'd JSON token here
 /**
- * Emulates how a REST call is *asynchronous* -- it calls your function back
- * some time in the future with data.
- */
-function emulateServerReturn(data, cb) {
-  setTimeout(() => {
-    cb(data);
-  }, 4);
-}
-
-var token = ''; // <-- Put your base64'd JSON token here
-/**
- * Properly configuresend an XMLHttpRequest with error handling,
+ * Properly configure+send an XMLHttpRequest with error handling,
  * authorization token, and other needed properties.
  */
 function sendXHR(verb, resource, body, cb) {
   var xhr = new XMLHttpRequest();
   xhr.open(verb, resource);
-  xhr.setRequestHeader('Authorization', 'Bearer '  token);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
 
   // The below comment tells ESLint that FacebookError is a global.
   // Otherwise, ESLint would complain about it! (See what happens in Atom if
@@ -38,8 +28,8 @@ function sendXHR(verb, resource, body, cb) {
       // The server may have included some response text with details concerning
       // the error.
       var responseText = xhr.responseText;
-      FacebookError('Could not '  verb  " "  resource  ": Received "
-		            statusCode  " "  statusText  ": "  responseText);
+      FacebookError('Could not ' + verb + " " + resource + ": Received " +
+      statusCode + " " + statusText + ": " + responseText);
     }
   });
 
@@ -49,14 +39,14 @@ function sendXHR(verb, resource, body, cb) {
 
   // Network failure: Could not connect to server.
   xhr.addEventListener('error', function() {
-    FacebookError('Could not '  verb  " "  resource
-	              ": Could not connect to the server.");
+    FacebookError('Could not ' + verb + " " + resource +
+    ": Could not connect to the server.");
   });
 
   // Network failure: request took too long to complete.
   xhr.addEventListener('timeout', function() {
-    FacebookError('Could not '  verb  " "  resource
-		          ": Request timed out.");
+    FacebookError('Could not ' + verb + " " + resource +
+    ": Request timed out.");
   });
 
   switch (typeof(body)) {
@@ -76,25 +66,8 @@ function sendXHR(verb, resource, body, cb) {
       xhr.send(JSON.stringify(body));
       break;
     default:
-      throw new Error('Unknown body type: '  typeof(body));
+      throw new Error('Unknown body type: ' + typeof(body));
   }
-}
-
-/**
- * Resolves a feed item. Internal to the server, since it's synchronous.
- */
-function getFeedItemSync(feedItemId) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  // Resolve 'like' counter.
-  feedItem.likeCounter = feedItem.likeCounter.map((id) => readDocument('users', id));
-  // Assuming a StatusUpdate. If we had other types of FeedItems in the DB, we would
-  // need to check the type and have logic for each type.
-  feedItem.contents.author = readDocument('users', feedItem.contents.author);
-  // Resolve comment author.
-  feedItem.comments.forEach((comment) => {
-    comment.author = readDocument('users', comment.author);
-  });
-  return feedItem;
 }
 
 /**
@@ -126,13 +99,14 @@ export function postStatusUpdate(user, location, contents, cb) {
  * Adds a new comment to the database on the given feed item.
  */
 export function postComment(feedItemId, author, contents, cb) {
-    sendXHR('POST', '/feeditem/'  feedItemId  '/commentthread/', {
-       'author': author,
-       'contents': contents,
-       'commentDate': new Date().getTime()
-     },
-     (xhr) => {
-       cb(JSON.parse(xhr.responseText))
+  sendXHR('POST', '/feeditem/' + feedItemId + '/commentthread/', {
+    'author': author,
+    'contents': contents,
+    'commentDate': new Date().getTime()
+  },
+  (xhr) => {
+    cb(JSON.parse(xhr.responseText))
+  });
 }
 
 /**
@@ -140,7 +114,7 @@ export function postComment(feedItemId, author, contents, cb) {
  * Provides an updated likeCounter in the response.
  */
 export function likeFeedItem(feedItemId, userId, cb) {
-  sendXHR('PUT', '/feeditem/'  feedItemId  '/likelist/'  userId,
+  sendXHR('PUT', '/feeditem/' + feedItemId + '/likelist/' + userId,
           undefined, (xhr) => {
     cb(JSON.parse(xhr.responseText));
   });
@@ -152,8 +126,28 @@ export function likeFeedItem(feedItemId, userId, cb) {
  * in the response.
  */
 export function unlikeFeedItem(feedItemId, userId, cb) {
-  sendXHR('DELETE', '/feeditem/'  feedItemId  '/likelist/'  userId,
-	      undefined, (xhr) => {
+  sendXHR('DELETE', '/feeditem/' + feedItemId + '/likelist/' + userId,
+  undefined, (xhr) => {
+    cb(JSON.parse(xhr.responseText));
+  });
+}
+
+/**
+ * Adds a 'like' to a comment.
+ */
+export function likeComment(feedItemId, com, userId, cb) {
+  sendXHR('PUT', '/feeditem/' + feedItemId + '/commentthread/' + com +
+            '/likelist/' + userId, undefined, (xhr) => {
+              cb(JSON.parse(xhr.responseText));
+            });
+}
+
+/**
+ * Removes a 'like' from a comment.
+ */
+export function unlikeComment(feedItemId, com, userId, cb) {
+  sendXHR('DELETE', '/feeditem/' + feedItemId + '/commentthread/' + com +
+  '/likelist/' + userId, undefined, (xhr) => {
     cb(JSON.parse(xhr.responseText));
   });
 }
@@ -162,28 +156,16 @@ export function unlikeFeedItem(feedItemId, userId, cb) {
  * Updates the text in a feed item (assumes a status update)
  */
 export function updateFeedItemText(feedItemId, newContent, cb) {
-  sendXHR('PUT', '/feeditem/'  feedItemId  '/content', newContent, (xhr) => {
+  sendXHR('PUT', '/feeditem/' + feedItemId + '/content', newContent, (xhr) => {
     cb(JSON.parse(xhr.responseText));
   });
 }
-
-export function likeComment(feedItemId, com, userId, cb) {
-   sendXHR('PUT', '/feeditem/'  feedItemId  '/commentthread/'  com
-             '/likelist/'  userId, undefined, (xhr) => {
-               cb(JSON.parse(xhr.responseText));
-             });
-
-export function unlikeComment(feedItemId, com, userId, cb) {
-   sendXHR('DELETE', '/feeditem/'  feedItemId  '/commentthread/'  com
-   '/likelist/'  userId, undefined, (xhr) => {
-     cb(JSON.parse(xhr.responseText));
-   });
 
 /**
  * Deletes a feed item.
  */
 export function deleteFeedItem(feedItemId, cb) {
-  sendXHR('DELETE', '/feeditem/'  feedItemId, undefined, () => {
+  sendXHR('DELETE', '/feeditem/' + feedItemId, undefined, () => {
     cb();
   });
 }
